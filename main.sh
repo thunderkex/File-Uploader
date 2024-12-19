@@ -11,6 +11,15 @@ fi
 FILE="$1"
 SERVICE="${2:-gofile}"  # Default to 'gofile' if no service is specified
 
+check_dependencies() {
+    if ! command -v jq &> /dev/null; then
+    echo "jq is not installed. Installing jq..."
+    sudo apt-get update
+    sudo apt-get install -y jq
+    else
+    echo "jq is already installed."
+    fi
+}
 # Function to upload to GoFile
 upload_to_gofile() {
     # Query GoFile API to find the best server for upload
@@ -95,6 +104,41 @@ upload_to_onedrive() {
     echo "Download link from OneDrive: $LINK"
 }
 
+# Function to upload to SourceForge
+upload_to_sourceforge() {
+    API_KEY="your_sourceforge_api_key"
+    PROJECT_NAME="your_project_name"
+    DEST_PATH="/path/on/sourceforge"
+
+    # Upload the file to SourceForge
+    RESPONSE=$(curl -s -X POST "https://frs.sourceforge.net/api/upload" \
+        -H "Authorization: Bearer $API_KEY" \
+        -F "file=@$FILE" \
+        -F "project=$PROJECT_NAME" \
+        -F "path=$DEST_PATH")
+
+    # Check if the upload was successful
+    if [[ $? -ne 0 ]]; then
+        echo "ERROR: Failed to upload the file to SourceForge."
+        echo "Please check your internet connection and try again."
+        exit 1
+    fi
+
+    # Extract the download link from the response
+    LINK=$(echo "$RESPONSE" | jq -r '.link')
+
+    # Check if the link was successfully extracted
+    if [[ "$LINK" == "null" ]]; then
+        echo "ERROR: Failed to retrieve the download link from SourceForge."
+        echo "Response: $RESPONSE"
+        exit 1
+    fi
+
+    # Display the download link
+    echo "Download link from SourceForge: $LINK"
+}
+
+check_dependencies
 # Determine which service to use
 case "$SERVICE" in
     gofile)
@@ -103,9 +147,12 @@ case "$SERVICE" in
     onedrive)
         upload_to_onedrive
         ;;
+    sourceforge)
+        upload_to_sourceforge
+        ;;
     *)
         echo "ERROR: Unknown service '$SERVICE'."
-        echo "Available services: gofile, anotherfileservice"
+        echo "Available services: gofile, onedrive, sourceforge"
         exit 1
         ;;
 esac
